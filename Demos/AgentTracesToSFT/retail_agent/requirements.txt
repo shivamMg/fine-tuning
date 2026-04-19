@@ -1,0 +1,7 @@
+# Install azure-ai-agentserver-responses separately
+#   pip install azure-ai-agentserver-responses==1.0.0a20260413003 -i https://pkgs.dev.azure.com/azure-sdk/public/_packaging/azure-sdk-for-python/pypi/simple/
+--extra-index-url https://pkgs.dev.azure.com/azure-sdk/public/_packaging/azure-sdk-for-python/pypi/simple/
+azure-ai-agentserver-responses==1.0.0a20260413003
+azure-identity
+langchain-openai
+langgraph
