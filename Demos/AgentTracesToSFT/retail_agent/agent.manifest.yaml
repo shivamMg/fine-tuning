@@ -1,9 +1,6 @@
-name: langgraph-chat-responses
+name: retail-agent-langgraph
 description: >
-  Multi-turn chat agent built with LangGraph and Azure OpenAI using the
-  responses protocol.  Demonstrates a tool-calling agent graph (chatbot ↔ tools)
-  with server-side conversation state via previous_response_id.
-  Includes get_current_time and calculator tools.
+  Retail Agent written using LangGraph.
 metadata:
   tags:
     - AI Agent Hosting
@@ -11,7 +8,7 @@ metadata:
     - LangGraph
     - LangChain
 template:
-  name: langgraph-chat-responses
+  name: retail-agent-langgraph
   kind: hosted
   protocols:
     - protocol: responses
@@ -23,5 +20,5 @@ template:
       value: "{{chat}}"
 resources:
   - kind: model
-    id: gpt-4o
+    id: gpt-4.1
     name: chat
