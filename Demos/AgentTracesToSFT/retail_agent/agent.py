@@ -1,11 +1,6 @@
 import asyncio
+import logging
 import os
-
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-from langchain_openai import AzureChatOpenAI
-from langgraph.graph import StateGraph, START, END, MessagesState
-from langgraph.prebuilt import ToolNode
-from langchain_core.messages import HumanMessage, AIMessage
 
 from azure.ai.agentserver.responses import (
     CreateResponse,
@@ -18,11 +13,25 @@ from azure.ai.agentserver.responses.models import (
     MessageContentInputTextContent,
     MessageContentOutputTextContent,
 )
+from azure.ai.agentserver.responses.store._foundry_errors import FoundryResourceNotFoundError
+from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from azure.monitor.opentelemetry.exporter import AzureMonitorTraceExporter
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_openai import AzureChatOpenAI
+from langgraph.graph import END, START, MessagesState, StateGraph
+from langgraph.prebuilt import ToolNode
+from opentelemetry import trace
+from opentelemetry.instrumentation.langchain import LangchainInstrumentor
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
 from agent_tools import AgentTools
 
 
 AZURE_OPENAI_ENDPOINT = os.environ["AZURE_OPENAI_ENDPOINT"]
 AZURE_AI_MODEL_DEPLOYMENT_NAME = os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"]
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
     "You are a retail customer service assistant. "
@@ -73,6 +82,21 @@ def history_to_langchain_messages(history: list) -> list:
     return messages
 
 
+def init_tracing() -> None:
+    connection_string = os.environ.get("APPLICATION_INSIGHTS_CONNECTION_STRING")
+    if not connection_string:
+        logger.warning("APPLICATION_INSIGHTS_CONNECTION_STRING is not set; tracing is disabled.")
+        return
+
+    exporter = AzureMonitorTraceExporter(connection_string=connection_string)
+    provider = TracerProvider()
+    provider.add_span_processor(BatchSpanProcessor(exporter))
+    trace.set_tracer_provider(provider)
+
+    LangchainInstrumentor().instrument()
+
+
+init_tracing()
 credential = DefaultAzureCredential()
 token_provider = get_bearer_token_provider(credential, "https://ai.azure.com/.default")
 graph = build_graph(
@@ -90,8 +114,11 @@ async def handle_create(
     context: ResponseContext,
     cancellation_signal: asyncio.Event,
 ):
-    history = await context.get_history()
     current_input = await context.get_input_text()
+    try:
+        history = await context.get_history()
+    except FoundryResourceNotFoundError:
+        history = []
 
     lc_messages = history_to_langchain_messages(history)
     lc_messages.append(HumanMessage(content=current_input))

@@ -1,7 +1,10 @@
-# Install azure-ai-agentserver-responses separately
-#   pip install azure-ai-agentserver-responses==1.0.0a20260413003 -i https://pkgs.dev.azure.com/azure-sdk/public/_packaging/azure-sdk-for-python/pypi/simple/
---extra-index-url https://pkgs.dev.azure.com/azure-sdk/public/_packaging/azure-sdk-for-python/pypi/simple/
-azure-ai-agentserver-responses==1.0.0a20260413003
-azure-identity
-langchain-openai
-langgraph
+# azure-ai-agentserver-responses must be installed from private index along with its dependencies azure-ai-agentserver-core and azure-monitor-opentelemetry-exporter.
+# Specifying global --extra-index-url in requirements.txt fails so we need to specify the full path for each package as below.
+# Command for reference: pip install azure-ai-agentserver-responses==1.0.0a20260413003 -i https://pkgs.dev.azure.com/azure-sdk/public/_packaging/azure-sdk-for-python/pypi/simple/
+azure-ai-agentserver-responses @ https://pkgs.dev.azure.com/azure-sdk/29ec6040-b234-4e31-b139-33dc4287b756/_packaging/3572dbf9-b5ef-433b-9137-fc4d7768e7cc/pypi/download/azure-ai-agentserver-responses/1a20260413003/azure_ai_agentserver_responses-1.0.0a20260413003-py3-none-any.whl
+azure-ai-agentserver-core @ https://pkgs.dev.azure.com/azure-sdk/29ec6040-b234-4e31-b139-33dc4287b756/_packaging/3572dbf9-b5ef-433b-9137-fc4d7768e7cc/pypi/download/azure-ai-agentserver-core/2a20260419001/azure_ai_agentserver_core-2.0.0a20260419001-py3-none-any.whl
+azure-monitor-opentelemetry-exporter @ https://pkgs.dev.azure.com/azure-sdk/29ec6040-b234-4e31-b139-33dc4287b756/_packaging/3572dbf9-b5ef-433b-9137-fc4d7768e7cc/pypi/download/azure-monitor-opentelemetry-exporter/1a20260417001/azure_monitor_opentelemetry_exporter-1.0.0a20260417001-py2.py3-none-any.whl
+azure-identity==1.25.3
+langchain-openai==1.1.14
+langgraph==1.1.8
+opentelemetry-instrumentation-langchain==0.57.0
