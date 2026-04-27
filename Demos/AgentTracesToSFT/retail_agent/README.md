@@ -78,3 +78,7 @@ curl -N -X POST http://localhost:8088/responses \
 azd ai agent init -m agent.manifest.yaml
 azd up
 ```
+
+If you change `agent.manifest.yaml` later, rerun `azd ai agent init -m agent.manifest.yaml` before `azd deploy` so the generated `agent.yaml` stays in sync. `azd deploy` uses the generated agent spec, not the manifest directly.
+
+Do not declare `APPLICATIONINSIGHTS_CONNECTION_STRING` in `agent.manifest.yaml` or `agent.yaml`. Hosted Agents reserve that variable for platform use and inject it automatically when monitoring is enabled for the project. The agent runtime reads it automatically, and this sample only adds LangChain instrumentation on top of the host-managed tracer provider.

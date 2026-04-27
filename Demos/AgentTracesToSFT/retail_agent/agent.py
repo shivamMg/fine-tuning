@@ -15,15 +15,11 @@ from azure.ai.agentserver.responses.models import (
 )
 from azure.ai.agentserver.responses.store._foundry_errors import FoundryResourceNotFoundError
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-from azure.monitor.opentelemetry.exporter import AzureMonitorTraceExporter
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import AzureChatOpenAI
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
-from opentelemetry import trace
 from opentelemetry.instrumentation.langchain import LangchainInstrumentor
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from agent_tools import AgentTools
 
@@ -82,21 +78,11 @@ def history_to_langchain_messages(history: list) -> list:
     return messages
 
 
-def init_tracing() -> None:
-    connection_string = os.environ.get("APPLICATION_INSIGHTS_CONNECTION_STRING")
-    if not connection_string:
-        logger.warning("APPLICATION_INSIGHTS_CONNECTION_STRING is not set; tracing is disabled.")
-        return
-
-    exporter = AzureMonitorTraceExporter(connection_string=connection_string)
-    provider = TracerProvider()
-    provider.add_span_processor(BatchSpanProcessor(exporter))
-    trace.set_tracer_provider(provider)
-
+def init_instrumentation() -> None:
+    """Attach LangChain instrumentation to OTel tracing setup inside AgentServerHost."""
     LangchainInstrumentor().instrument()
 
 
-init_tracing()
 credential = DefaultAzureCredential()
 token_provider = get_bearer_token_provider(credential, "https://ai.azure.com/.default")
 graph = build_graph(
@@ -106,6 +92,7 @@ graph = build_graph(
     tools=AgentTools.all_tools(),
 )
 app = ResponsesAgentServerHost(options=ResponsesServerOptions(default_fetch_history_count=20))
+init_instrumentation()
 
 
 @app.create_handler
