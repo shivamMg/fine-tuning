@@ -14,14 +14,14 @@ and Azure OpenAI, hosted via the **responses** protocol.
 ## Architecture
 
 ```
-+--------------------+                   +----------------------------------+                          +----------------------+
-| User or client app |                   | Retail Agent                     | -- /chat/completions --> | Azure OpenAI LLM     |
-|                    |   --- POST -->    | LangGraph loop                   |                          +----------------------+
++--------------------+                   +----------------------------------+                            +----------------------+
+| User or client app |                   | Retail Agent                     | -- Db calls from tools --> | Database             |
+|                    |   --- POST -->    | LangGraph loop                   |                            +----------------------+
 | JSON body:         |    /responses     | chatbot -> tools -> chatbot      |
 | - model            |                   |                                  |
-| - input            |                   | functions:                       |
-| - previous_        |                   | - find_user_id_by_email()        |
-|   response_id?     |                   | - list_user_orders()             |
+| - input            |                   | functions:                       |                            +----------------------+
+| - previous_        |                   | - find_user_id_by_email()        | -- /chat/completions -->   | Azure OpenAI LLM     |
+|   response_id?     |                   | - list_user_orders()             |                            +----------------------+
 |                    |                   | - ...                            |
 +--------------------+                   +----------------------------------+
                                                   |
