@@ -6,4 +6,4 @@ COPY . user_agent/
 WORKDIR /app/user_agent
 RUN uv pip install --system --prerelease=allow -r requirements.txt
 EXPOSE 8088
-CMD ["python", "agent.py"]
+CMD ["python", "main.py"]
