@@ -15,11 +15,11 @@ from azure.ai.agentserver.responses.models import (
 )
 from azure.ai.agentserver.responses.store._foundry_errors import FoundryResourceNotFoundError
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from langchain_azure_ai.callbacks.tracers import enable_auto_tracing
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import AzureChatOpenAI
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
-from opentelemetry.instrumentation.langchain import LangchainInstrumentor
 
 from agent_tools import AgentTools
 
@@ -78,11 +78,12 @@ def history_to_langchain_messages(history: list) -> list:
     return messages
 
 
-def init_instrumentation() -> None:
-    """Attach LangChain instrumentation to OTel tracing setup inside AgentServerHost."""
-    LangchainInstrumentor().instrument()
-
-
+enable_auto_tracing(
+    enable_content_recording=True,
+    trace_all_langgraph_nodes=True,
+    provider_name="azure_openai",
+    auto_configure_azure_monitor=False,
+)
 credential = DefaultAzureCredential()
 token_provider = get_bearer_token_provider(credential, "https://ai.azure.com/.default")
 graph = build_graph(
@@ -92,10 +93,9 @@ graph = build_graph(
     tools=AgentTools.all_tools(),
 )
 app = ResponsesAgentServerHost(options=ResponsesServerOptions(default_fetch_history_count=20))
-init_instrumentation()
 
 
-@app.create_handler
+@app.response_handler
 async def handle_create(
     request: CreateResponse,
     context: ResponseContext,
@@ -110,9 +110,7 @@ async def handle_create(
     lc_messages = history_to_langchain_messages(history)
     lc_messages.append(HumanMessage(content=current_input))
 
-    result = await asyncio.get_event_loop().run_in_executor(
-        None, lambda: graph.invoke({"messages": lc_messages})
-    )
+    result = await graph.ainvoke({"messages": lc_messages})
     final_text = result["messages"][-1].content
 
     return TextResponse(context, request, text=final_text)
