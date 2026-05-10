@@ -37,31 +37,15 @@ Build and deploy with the following command. Make sure to replace placeholders w
 `--registry-server` is optional if you want to push the image to your ACR instead of letting Container Apps to create and use a new ACR.
 
 ```bash
-az containerapp up \
-  --name retail-mcp-server \
-  --subscription <YOUR_SUBSCRIPTION> \
-  --resource-group <YOUR_RG> \
-  --source . \
-  --ingress external \
-  --target-port 8000 \
-  --env-vars PORT=8000 \
-  --registry-server <YOUR_ACR>.azurecr.io
+az containerapp up --name retail-mcp-server --subscription <YOUR_SUBSCRIPTION> --resource-group <YOUR_RG> --source . --ingress external --target-port 8000 --env-vars PORT=8000 --registry-server <YOUR_ACR>.azurecr.io
 ```
 
 Then set the `MCP_API_KEY` secret (only needed once — persists across redeployments):
 
 ```bash
-az containerapp secret set \
-  --name retail-mcp-server \
-  --subscription <YOUR_SUBSCRIPTION> \
-  -g <YOUR_RG> \
-  --secrets mcp-api-key=<YOUR_SECRET_KEY>
+az containerapp secret set --name retail-mcp-server --subscription <YOUR_SUBSCRIPTION> -g <YOUR_RG> --secrets mcp-api-key=<YOUR_SECRET_KEY>
 
-az containerapp update \
-  --name retail-mcp-server \
-  --subscription <YOUR_SUBSCRIPTION> \
-  -g <YOUR_RG> \
-  --set-env-vars MCP_API_KEY=secretref:mcp-api-key
+az containerapp update --name retail-mcp-server --subscription <YOUR_SUBSCRIPTION> -g <YOUR_RG> --set-env-vars MCP_API_KEY=secretref:mcp-api-key
 ```
 
 
