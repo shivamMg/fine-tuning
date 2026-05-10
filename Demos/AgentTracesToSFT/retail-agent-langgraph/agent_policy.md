@@ -1,4 +1,4 @@
-# Policy
+# Agent Policy
 
 ## Always Resolve User
 

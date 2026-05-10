@@ -24,10 +24,10 @@ from langgraph.prebuilt import ToolNode
 from tools import AgentTools
 
 
+logger = logging.getLogger(__name__)
+
 AZURE_OPENAI_ENDPOINT = os.environ["AZURE_OPENAI_ENDPOINT"]
 AZURE_AI_MODEL_DEPLOYMENT_NAME = os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"]
-
-logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (
     "You are a retail customer service assistant. "
@@ -45,8 +45,12 @@ def build_graph(azure_endpoint, azure_deployment, token_provider, tools) -> Stat
     )
     llm_with_tools = llm.bind_tools(tools)
 
+    with open("agent_policy.md") as f:
+        agent_policy = f.read()
+    system_message = SYSTEM_PROMPT + "\n\n" + agent_policy
+
     def chatbot(state: MessagesState):
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}] + state["messages"]
+        messages = [{"role": "system", "content": system_message}] + state["messages"]
         return {"messages": [llm_with_tools.invoke(messages)]}
 
     def route_tools(state: MessagesState):
