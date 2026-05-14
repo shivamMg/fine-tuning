@@ -37,7 +37,7 @@ A multi-turn conversational tool-calling agent built with [LangGraph](https://la
 ### Prerequisites
 
 - [Install Azure Developer CLI (azd)](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd?tabs=winget-windows%2Cbrew-mac%2Cscript-linux&pivots=os-windows)
-- Azure AI Agents extension that can be installed using: `azd ext install azure.ai.agents`
+- Install Azure AI Agents extension using: `azd ext install azure.ai.agents`
 - Owner or RBAC Administrator role on your Azure subscription to assign roles.
 - Note: Below commands have been tested on PowerShell. Adjust syntax as needed for other shells.
 
@@ -90,6 +90,12 @@ az role assignment create --assignee $AgentIdentityClientId --role "Azure AI Use
 
 ```shell
 azd ai agent invoke "Please share my orders. My email is ava.moore2222@example.com"
+```
+
+Use [Copilot CLI](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-in-the-cli) to generate synthetic conversations with the agent. Run this from the parent directory of `retail-agent-langgraph/` so Copilot can read the agent's source files for context:
+
+```powershell
+copilot --allow-all-tools -p 'Read the files under ./retail-agent-langgraph to understand what this agent does and what tools it exposes. Then generate 10 different realistic end-user conversations with it. For each conversation: (1) start a new conversation with `azd ai agent invoke "<first user message>" --new-conversation` and capture the conversation_id from the response, (2) continue with up to 2 more follow-up turns using `azd ai agent invoke "<next user message>" --conversation-id <conversation_id>`. Keep each conversation to a maximum of 3 turns. Vary the user personas, intents, and tools exercised across the 10 conversations.'
 ```
 
 
