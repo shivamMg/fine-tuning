@@ -20,7 +20,7 @@ A multi-turn conversational tool-calling agent built with [LangGraph](https://la
 | JSON body:         |                   |                                  |                             +----------------------+
 | - input            |                   | tools:                           |
 | - previous_        |                   | - find_user_id_by_email()        |                             +----------------------+
-|   response_id?     |                   | - list_user_orders()             |   --- Agent Traces --->     | Application Insights |
+|   response_id?     |                   | - list_user_orders()             |  ----- Agent Traces  --->   | Application Insights |
 |                    |                   | - ...                            |                             +----------------------+
 +--------------------+                   +----------------------------------+
                                                        |
