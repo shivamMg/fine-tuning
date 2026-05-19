@@ -38,15 +38,18 @@ A multi-turn conversational tool-calling agent built with [LangGraph](https://la
 
 - [Install Azure Developer CLI (azd)](https://learn.microsoft.com/en-us/azure/developer/azure-developer-cli/install-azd?tabs=winget-windows%2Cbrew-mac%2Cscript-linux&pivots=os-windows)
 - Install Azure AI Agents extension using: `azd ext install azure.ai.agents`
-- Owner or RBAC Administrator role on your Azure subscription to assign roles.
+- `Owner` or `RBAC Administrator` role on your Azure subscription to assign roles.
 - Note: Below commands have been tested on PowerShell. Adjust syntax as needed for other shells.
 
 
 ### Initialize Agent in Foundry project
 
-Your Foundry project must meet the following requirements:
-- It needs to have a model deployment with `gpt-4.1` name (as referenced in agent.manifest.yaml).
-- It must be connected to Application Insights for traces. Follow steps in this doc to connect one: [Set up tracing in Microsoft Foundry](https://learn.microsoft.com/en-us/azure/foundry/observability/how-to/trace-agent-setup).
+To use your existing Foundry project, you'll need the following resources:
+1. Model deployment quota for `gpt-4.1`.
+2. Azure Container Registry (ACR) resource. Keep its login server handy: `<YOUR_REGISTRY>.azurecr.io`.
+3. Application Insights resource. Keep its resource ID and connection string handy: `/subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/<YOUR_RESOURCE_GROUP>/providers/Microsoft.Insights/components/<YOUR_APP_INSIGHTS_NAME>` and `InstrumentationKey=...`.
+
+`azd ai agent init` command below will prompt you to share these values.
 
 ```shell
 azd auth login
@@ -61,7 +64,7 @@ azd env set enableHostedAgentVNext true
 
 #### (Optional) Create a new Foundry project
 
-If you don't have an existing Foundry project, you can create a new one using `azd` which will set up the necessary resources including Application Insights. Skip this step if you already have a Foundry project.
+If you don't have an existing Foundry project, you can create a new one using `azd` which will set up the necessary resources including Application Insights and ACR. Skip this step if you already have a Foundry project.
 
 ```shell
 azd auth login
