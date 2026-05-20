@@ -45,19 +45,29 @@ A multi-turn conversational tool-calling agent built with [LangGraph](https://la
 ### Initialize Agent in Foundry project
 
 To use your existing Foundry project, you'll need the following resources:
-1. Model deployment quota for `gpt-4.1`.
-2. Azure Container Registry (ACR) resource. Keep its login server handy: `<YOUR_REGISTRY>.azurecr.io`.
-3. Application Insights resource. Keep its resource ID and connection string handy: `/subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/<YOUR_RESOURCE_GROUP>/providers/Microsoft.Insights/components/<YOUR_APP_INSIGHTS_NAME>` and `InstrumentationKey=...`.
+1. Model deployment with name `gpt-4.1` in the Foundry project.
+2. Azure Container Registry (ACR) resource. Keep its resource ID and login server handy:
+   - `/subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/<YOUR_RESOURCE_GROUP>/providers/Microsoft.ContainerRegistry/registries/<YOUR_ACR_NAME>`
+   - `<YOUR_REGISTRY>.azurecr.io`.
+3. Application Insights resource. Keep its resource ID and connection string handy:
+   - `/subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/<YOUR_RESOURCE_GROUP>/providers/Microsoft.Insights/components/<YOUR_APP_INSIGHTS_NAME>`
+   - `InstrumentationKey=...`.
 
 `azd ai agent init` command below will prompt you to share these values.
 
 ```shell
-azd auth login
-
 # Replace placeholders with your Foundry project details
 $env:FOUNDRY_PROJECT_ID="/subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/<YOUR_RESOURCE_GROUP>/providers/Microsoft.CognitiveServices/accounts/<YOUR_FOUNDRY_ACCOUNT_NAME>/projects/<YOUR_PROJECT_NAME>"
 
+# Replace placeholders with your ACR details
+$env:ACR_ID="/subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/<YOUR_RESOURCE_GROUP>/providers/Microsoft.ContainerRegistry/registries/<YOUR_ACR_NAME>"
+
+# Grant "AcrPull" role to Foundry project's identity so it can pull container images
+$ProjectIdentityClientId = $(az resource show --ids $env:FOUNDRY_PROJECT_ID --query identity.principalId -o tsv)
+az role assignment create --assignee $ProjectIdentityClientId --role "AcrPull" --scope $env:ACR_ID
+
 # Run from parent directory of  retail-agent-langgraph/
+azd auth login
 azd ai agent init -m retail-agent-langgraph/agent.manifest.yaml --project-id $env:FOUNDRY_PROJECT_ID --model gpt-4.1
 azd env set enableHostedAgentVNext true
 ```
@@ -83,9 +93,9 @@ azd deploy
 # Extract Foundry ID from FOUNDRY_PROJECT_ID in powershell
 $env:FOUNDRY_ID = ($env:FOUNDRY_PROJECT_ID -replace '/projects/.*$', '')
 
-# Grant "Azure AI User" role to Agent's identity so it can use Foundry resources
+# Grant "Azure AI/Foundry User" role to Agent's identity so it can use Foundry resources
 $AgentIdentityClientId = (azd ai agent show -o table | Select-String "Instance Identity Client ID").Line -replace ".*Client ID\s+",""
-az role assignment create --assignee $AgentIdentityClientId --role "Azure AI User" --scope $env:FOUNDRY_ID
+az role assignment create --assignee $AgentIdentityClientId --role "53ca6127-db72-4b80-b1b0-d745d6d5456d" --scope $env:FOUNDRY_ID
 ```
 
 
