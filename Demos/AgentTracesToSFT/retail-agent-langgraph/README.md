@@ -42,62 +42,23 @@ A multi-turn conversational tool-calling agent built with [LangGraph](https://la
 - Note: Below commands have been tested on PowerShell. Adjust syntax as needed for other shells.
 
 
-### Initialize Agent in Foundry project
-
-To use your existing Foundry project, you'll need the following resources:
-1. Model deployment with name `gpt-4.1` in the Foundry project.
-2. Azure Container Registry (ACR) resource. Keep its resource ID and login server handy:
-   - `/subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/<YOUR_RESOURCE_GROUP>/providers/Microsoft.ContainerRegistry/registries/<YOUR_ACR_NAME>`
-   - `<YOUR_REGISTRY>.azurecr.io`.
-3. Application Insights resource. Keep its resource ID and connection string handy:
-   - `/subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/<YOUR_RESOURCE_GROUP>/providers/Microsoft.Insights/components/<YOUR_APP_INSIGHTS_NAME>`
-   - `InstrumentationKey=...`.
-
-`azd ai agent init` command below will prompt you to share these values.
+### Deploy Agent to Foundry project
 
 ```shell
-# Replace placeholders with your Foundry project details
-$env:FOUNDRY_PROJECT_ID="/subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/<YOUR_RESOURCE_GROUP>/providers/Microsoft.CognitiveServices/accounts/<YOUR_FOUNDRY_ACCOUNT_NAME>/projects/<YOUR_PROJECT_NAME>"
-
-# Replace placeholders with your ACR details
-$env:ACR_ID="/subscriptions/<YOUR_SUBSCRIPTION_ID>/resourceGroups/<YOUR_RESOURCE_GROUP>/providers/Microsoft.ContainerRegistry/registries/<YOUR_ACR_NAME>"
-
-# Grant "AcrPull" role to Foundry project's identity so it can pull container images
-$ProjectIdentityClientId = $(az resource show --ids $env:FOUNDRY_PROJECT_ID --query identity.principalId -o tsv)
-az role assignment create --assignee $ProjectIdentityClientId --role "AcrPull" --scope $env:ACR_ID
-
-# Run from parent directory of  retail-agent-langgraph/
+az account set --subscription "<YOUR_SUBSCRIPTION_NAME_OR_ID>"
 azd auth login
-azd ai agent init -m retail-agent-langgraph/agent.manifest.yaml --project-id $env:FOUNDRY_PROJECT_ID --model gpt-4.1
-azd env set enableHostedAgentVNext true
+
+mkdir hosted-agent && cd hosted-agent
+azd ai agent init -m ../retail-agent-langgraph/agent.manifest.yaml
+
+cd retail-agent-langgraph
+azd up
+
+# Grant "Foundry User" role to Agent's identity so it can use Foundry resources
+$env:AZURE_AI_ACCOUNT_ID = ((cat .azure/retail-agent-langgraph-dev/.env | Select-String -Pattern '^AZURE_AI_ACCOUNT_ID').Line -split '=', 2)[1].Trim('"')
+$env:AGENT_IDENTITY_CLIENT_ID = (azd ai agent show -o table | Select-String "Instance Identity Client ID").Line -replace ".*Client ID\s+",""
+az role assignment create --assignee $env:AGENT_IDENTITY_CLIENT_ID --role "Foundry User" --scope $env:AZURE_AI_ACCOUNT_ID
 ```
-
-#### (Optional) Create a new Foundry project
-
-If you don't have an existing Foundry project, you can create a new one using `azd` which will set up the necessary resources including Application Insights and ACR. Skip this step if you already have a Foundry project.
-
-```shell
-azd auth login
-azd ai agent init -m retail-agent-langgraph/agent.manifest.yaml
-azd env set enableHostedAgentVNext=true
-pip install keyring artifacts-keyring
-azd provision
-```
-
-
-### Deploy Agent
-
-```shell
-azd deploy
-
-# Extract Foundry ID from FOUNDRY_PROJECT_ID in powershell
-$env:FOUNDRY_ID = ($env:FOUNDRY_PROJECT_ID -replace '/projects/.*$', '')
-
-# Grant "Azure AI/Foundry User" role to Agent's identity so it can use Foundry resources
-$AgentIdentityClientId = (azd ai agent show -o table | Select-String "Instance Identity Client ID").Line -replace ".*Client ID\s+",""
-az role assignment create --assignee $AgentIdentityClientId --role "53ca6127-db72-4b80-b1b0-d745d6d5456d" --scope $env:FOUNDRY_ID
-```
-
 
 ### Invoke Agent
 
@@ -105,7 +66,7 @@ az role assignment create --assignee $AgentIdentityClientId --role "53ca6127-db7
 azd ai agent invoke "Please share my orders. My email is ava.moore2222@example.com"
 ```
 
-Use [Copilot CLI](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-in-the-cli) to generate synthetic conversations with the agent. Run this from the parent directory of `retail-agent-langgraph/` so Copilot can read the agent's source files for context:
+Use [Copilot CLI](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-in-the-cli) to generate synthetic conversations with the agent:
 
 ```powershell
 copilot --allow-all-tools -p 'Read the files under ./retail-agent-langgraph to understand what this agent does and what tools it exposes. Then generate 10 different realistic end-user conversations with it. For each conversation: (1) start a new conversation with `azd ai agent invoke "<first user message>" --new-conversation` and capture the conversation_id from the response, (2) continue with up to 2 more follow-up turns using `azd ai agent invoke "<next user message>" --conversation-id <conversation_id>`. Keep each conversation to a maximum of 3 turns. Vary the user personas, intents, and tools exercised across the 10 conversations.'
@@ -114,10 +75,20 @@ copilot --allow-all-tools -p 'Read the files under ./retail-agent-langgraph to u
 
 ## Troubleshooting
 
-### Agent init fails with: "create_agent: HTTP request failed: AzureDeveloperCLICredential"
+### azd ai agent init fails with: 'create_agent: HTTP request failed: AzureDeveloperCLICredential'
 
-If an `azd` command fails with the following error, then run `azd auth logout` and `azd auth login` to refresh your credentials and try again.
+If an `azd` command fails with the following error:
 
-```
-create_agent: HTTP request failed: AzureDeveloperCLICredential: please run "azd auth login" from a command prompt to authenticate before using this credential
-```
+> create_agent: HTTP request failed: AzureDeveloperCLICredential: please run "azd auth login" from a command prompt to authenticate before using this credential
+
+then run `azd auth logout` and `azd auth login` to refresh your credentials and try again.
+
+### azd provision fails with: 'ERROR: The resource group location conflicts with the deployment.'
+
+If `azd provision` fails with the following error:
+
+> ERROR: The resource group location conflicts with the deployment.
+> Suggestion: This usually means the resource group already exists in a different region than the one you specified. Either use the existing resource group's region with 'azd env set AZURE_LOCATION <existing-region>', create a new environment with 'azd env new', or delete the existing resource group and retry
+> InvalidResourceGroupLocation: Invalid resource group location '<X_REGION>'. The Resource group already exists in location '<Y_REGION>'.
+
+Then run `azd env set AZURE_LOCATION <Y_REGION>` with the existing resource group's region and try again.
