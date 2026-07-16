@@ -15,16 +15,21 @@ from azure.ai.agentserver.responses.models import (
 )
 from azure.ai.agentserver.responses.store._foundry_errors import FoundryResourceNotFoundError
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-from langchain_azure_ai.callbacks.tracers import enable_auto_tracing
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_openai import AzureChatOpenAI
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
+from microsoft.opentelemetry import use_microsoft_opentelemetry
 
 from tools import AgentTools
 
 
 logger = logging.getLogger(__name__)
+
+# Microsoft OpenTelemetry's LangChain instrumentation reads these during initialization.
+# SPAN_ONLY records full GenAI messages on the chat spans but does not additionally duplicate them as log events.
+os.environ.setdefault("OTEL_SEMCONV_STABILITY_OPT_IN", "gen_ai_latest_experimental")
+os.environ.setdefault("OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT", "span_only")
 
 AZURE_OPENAI_ENDPOINT = os.environ["AZURE_OPENAI_ENDPOINT"]
 AZURE_AI_MODEL_DEPLOYMENT_NAME = os.environ["AZURE_AI_MODEL_DEPLOYMENT_NAME"]
@@ -82,11 +87,20 @@ def history_to_langchain_messages(history: list) -> list:
     return messages
 
 
-enable_auto_tracing(
-    enable_content_recording=True,
-    trace_all_langgraph_nodes=True,
-    provider_name="azure_openai",
-    auto_configure_azure_monitor=False,
+use_microsoft_opentelemetry(
+    # Foundry injects APPLICATIONINSIGHTS_CONNECTION_STRING for hosted agents.
+    # Explicitly enabling the exporter prevents the SDK from falling back to the
+    # console exporter when the agent starts.
+    enable_azure_monitor=True,
+    # Message bodies, tool arguments/results, and bound tool schemas are needed
+    # for the training-trace corpus. Treat this setting as sensitive telemetry.
+    enable_sensitive_data=True,
+    # Keep the LangChain spans that aggregate every model turn into the agent
+    # trace, including the full input/output message history and tool schemas.
+    instrumentation_options={"langchain": {"enabled": True}},
+    agent_name=os.getenv("AGENT_NAME", "retail-agent-langgraph"),
+    agent_version=os.getenv("AGENT_VERSION"),
+    agent_id=os.getenv("AGENT_ID"),
 )
 credential = DefaultAzureCredential()
 token_provider = get_bearer_token_provider(credential, "https://ai.azure.com/.default")
