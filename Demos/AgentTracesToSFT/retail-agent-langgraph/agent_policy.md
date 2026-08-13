@@ -1,8 +1,8 @@
 # Agent Policy
 
-## Always Resolve User
+## Resolve User first
 
-Always resolve the user first. Get the user id before doing anything else. Use find_user_id_by_email if user has shared their email else use find_user_id_by_name_zip if they've shared their name and zip code. If no details are provided, reply exactly with "Please share your email or name/zip code.".
+If the user id is not present in the conversation, then resolve the user first. Get the user id before doing anything else. Use find_user_id_by_email if user has shared their email else use find_user_id_by_name_zip if they've shared their name and zip code. If no details are provided, reply exactly with "Please share your email or name/zip code.".
 
 
 ## Calculate using Calculate tool

@@ -1,21 +1,26 @@
 import asyncio
+import json
 import logging
 import os
 
 from azure.ai.agentserver.responses import (
     CreateResponse,
     ResponseContext,
+    ResponseEventStream,
     ResponsesAgentServerHost,
     ResponsesServerOptions,
-    TextResponse,
 )
 from azure.ai.agentserver.responses.models import (
+    FunctionCallOutputItemParam,
+    FunctionToolCallOutputResource,
+    ItemFunctionToolCall,
     MessageContentInputTextContent,
     MessageContentOutputTextContent,
+    OutputItemFunctionToolCall,
 )
 from azure.ai.agentserver.responses.store._foundry_errors import FoundryResourceNotFoundError
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_openai import AzureChatOpenAI
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
@@ -77,14 +82,50 @@ def build_graph(azure_endpoint, azure_deployment, token_provider, tools) -> Stat
 def history_to_langchain_messages(history: list) -> list:
     """Convert responses-protocol history items to LangChain messages."""
     messages = []
+    pending_tool_calls = []
+
+    def flush_tool_calls():
+        if pending_tool_calls:
+            messages.append(AIMessage(content="", tool_calls=pending_tool_calls.copy()))
+            pending_tool_calls.clear()
+
     for item in history:
+        if isinstance(item, (ItemFunctionToolCall, OutputItemFunctionToolCall)):
+            try:
+                arguments = json.loads(item.arguments)
+            except (TypeError, json.JSONDecodeError):
+                logger.warning("Ignoring malformed JSON arguments for tool call %s", item.call_id)
+                arguments = {"raw_arguments": item.arguments}
+            if not isinstance(arguments, dict):
+                arguments = {"value": arguments}
+            pending_tool_calls.append({
+                "id": item.call_id,
+                "name": item.name,
+                "args": arguments,
+                "type": "tool_call",
+            })
+            continue
+
+        flush_tool_calls()
+
+        if isinstance(item, (FunctionCallOutputItemParam, FunctionToolCallOutputResource)):
+            output = item.output if isinstance(item.output, str) else json.dumps(item.output, ensure_ascii=False)
+            messages.append(ToolMessage(content=output, tool_call_id=item.call_id))
+            continue
+
         if hasattr(item, "content") and item.content:
             for content in item.content:
                 if isinstance(content, MessageContentOutputTextContent) and content.text:
                     messages.append(AIMessage(content=content.text))
                 elif isinstance(content, MessageContentInputTextContent) and content.text:
                     messages.append(HumanMessage(content=content.text))
+    flush_tool_calls()
     return messages
+
+
+def content_to_text(content) -> str:
+    """Convert LangChain string or structured message content to protocol text."""
+    return content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
 
 
 use_microsoft_opentelemetry(
@@ -110,7 +151,7 @@ graph = build_graph(
     token_provider=token_provider,
     tools=AgentTools.all_tools(),
 )
-app = ResponsesAgentServerHost(options=ResponsesServerOptions(default_fetch_history_count=20))
+app = ResponsesAgentServerHost(options=ResponsesServerOptions(default_fetch_history_count=100))
 
 
 @app.response_handler
@@ -128,10 +169,45 @@ async def handle_create(
     lc_messages = history_to_langchain_messages(history)
     lc_messages.append(HumanMessage(content=current_input))
 
-    result = await graph.ainvoke({"messages": lc_messages})
-    final_text = result["messages"][-1].content
+    stream = ResponseEventStream(response_id=context.response_id, request=request)
+    yield stream.emit_created()
+    yield stream.emit_in_progress()
 
-    return TextResponse(context, request, text=final_text)
+    result = await graph.ainvoke({"messages": lc_messages})
+    if cancellation_signal.is_set():
+        raise asyncio.CancelledError("Request was cancelled")
+
+    # MessagesState appends every assistant tool call, tool result, and final
+    # assistant message to the input history. Emit only those new messages.
+    new_messages = result["messages"][len(lc_messages):]
+    for message in new_messages:
+        if isinstance(message, AIMessage):
+            for tool_call in message.tool_calls:
+                arguments = json.dumps(
+                    tool_call.get("args", {}),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                for response_event in stream.output_item_function_call(
+                    name=tool_call["name"],
+                    call_id=tool_call["id"],
+                    arguments=arguments,
+                ):
+                    yield response_event
+
+            if message.content:
+                for response_event in stream.output_item_message(
+                    content_to_text(message.content)
+                ):
+                    yield response_event
+        elif isinstance(message, ToolMessage):
+            for response_event in stream.output_item_function_call_output(
+                call_id=message.tool_call_id,
+                output=content_to_text(message.content),
+            ):
+                yield response_event
+
+    yield stream.emit_completed()
 
 
 if __name__ == "__main__":
