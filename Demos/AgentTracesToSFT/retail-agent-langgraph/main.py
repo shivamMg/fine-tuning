@@ -133,15 +133,20 @@ use_microsoft_opentelemetry(
     # Explicitly enabling the exporter prevents the SDK from falling back to the
     # console exporter when the agent starts.
     enable_azure_monitor=True,
+    sampling_ratio=1.0,
     # Message bodies, tool arguments/results, and bound tool schemas are needed
     # for the training-trace corpus. Treat this setting as sensitive telemetry.
     enable_sensitive_data=True,
     # Keep the LangChain spans that aggregate every model turn into the agent
     # trace, including the full input/output message history and tool schemas.
-    instrumentation_options={"langchain": {"enabled": True}},
-    agent_name=os.getenv("AGENT_NAME", "retail-agent-langgraph"),
-    agent_version=os.getenv("AGENT_VERSION"),
-    agent_id=os.getenv("AGENT_ID"),
+    instrumentation_options={
+        "langchain": {
+            "enabled": True,
+            "agent_name": os.getenv("FOUNDRY_AGENT_NAME", "retail-agent-langgraph"),
+            "agent_version": os.getenv("FOUNDRY_AGENT_VERSION"),
+            "agent_id": os.getenv("FOUNDRY_AGENT_ID"),
+        }
+    },
 )
 credential = DefaultAzureCredential()
 token_provider = get_bearer_token_provider(credential, "https://ai.azure.com/.default")
