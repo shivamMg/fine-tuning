@@ -66,11 +66,32 @@ az role assignment create --assignee $env:AGENT_IDENTITY_CLIENT_ID --role "Found
 azd ai agent invoke "Please share my orders. My email is ava.moore2222@example.com"
 ```
 
-Use [Copilot CLI](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/use-copilot-in-the-cli) to generate synthetic conversations with the agent:
+#### Generate conversations
+
+Use [`conversation_simulator.py`](scripts/conversation_simulator.py) to generate synthetic conversations without a runtime `azd` dependency. It authenticates with `DefaultAzureCredential`, so first run `azd auth login` or `az login`.
+
+> **Warning:** scenarios exercise state-changing agent tools (cancel, modify address/payment/items, return, exchange), which mutate the agent's local database state.
+
+Install the client dependencies:
 
 ```powershell
-copilot --allow-all-tools -p 'Read the files under ./retail-agent-langgraph to understand what this agent does and what tools it exposes. Then generate 10 different realistic end-user conversations with it. For each conversation: (1) start a new conversation with `azd ai agent invoke "<first user message>" --new-conversation` and capture the conversation_id from the response, (2) continue with up to 2 more follow-up turns using `azd ai agent invoke "<next user message>" --conversation-id <conversation_id>`. Keep each conversation to a maximum of 3 turns. Vary the user personas, intents, and tools exercised across the 10 conversations.'
+pip install azure-identity azure-ai-projects requests
 ```
+
+Generate 10 conversations (2-4 turns each):
+
+```powershell
+# from retail-agent-langgraph
+python scripts/conversation_simulator.py `
+    --num-conversations 10 `
+    --project-endpoint "https://<acct>.services.ai.azure.com/api/projects/<project>" `
+    --agent-name "retail-agent-langgraph" `
+    --simulator-project-endpoint "https://<acct>.services.ai.azure.com/api/projects/<project>" `
+    --simulator-deployment "gpt-5.6-sol"
+```
+
+The script prints each Foundry `conversation_id`, writes transcripts to a JSONL file, and prints a final space-separated list of IDs. Use `--output` to set the JSONL path.
+Use `--agent-version <n>` to select a version, `--min-turns`/`--max-turns` to adjust the balanced turn range (defaults: 2/4), and `--seed` for reproducibility.
 
 
 ## Troubleshooting

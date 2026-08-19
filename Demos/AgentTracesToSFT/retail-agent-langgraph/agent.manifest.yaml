@@ -20,5 +20,5 @@ template:
       value: "{{chat}}"
 resources:
   - kind: model
-    id: gpt-4.1
+    id: gpt-5.6-sol
     name: chat

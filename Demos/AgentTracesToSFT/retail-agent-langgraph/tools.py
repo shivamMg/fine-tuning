@@ -3,6 +3,7 @@ import json
 import operator
 import os
 from datetime import datetime
+from typing import Literal
 
 from langchain_core.tools import tool
 
@@ -110,7 +111,7 @@ class AgentTools:
     @staticmethod
     @tool
     def get_order_details(order_id: str) -> str:
-        """Get the status and details of an order."""
+        """Get the status and details of an order. The order_id must include the leading '#' exactly as stored, for example '#W1234567'."""
         if order_id in AgentTools.db["orders"]:
             return json.dumps(AgentTools.db["orders"][order_id])
         return json.dumps({"error": "Order not found"})
@@ -118,7 +119,7 @@ class AgentTools:
     @staticmethod
     @tool
     def cancel_pending_order(order_id: str, reason: str) -> str:
-        """Cancel a pending order. Reason must be 'no longer needed' or 'ordered by mistake'."""
+        """Cancel a pending order. The order_id must include the leading '#' exactly as stored, for example '#W1234567'. Reason must be 'no longer needed' or 'ordered by mistake'."""
         if order_id not in AgentTools.db["orders"]:
             return json.dumps({"error": "Order not found"})
         order = AgentTools.db["orders"][order_id]
@@ -144,7 +145,7 @@ class AgentTools:
     def modify_pending_order_items(
         order_id: str, item_ids: list[str], new_item_ids: list[str], payment_method_id: str
     ) -> str:
-        """Modify items in a pending order to new items of the same product type."""
+        """Modify items in a pending order to new items of the same product type. The order_id must include the leading '#' exactly as stored, for example '#W1234567'."""
         if order_id not in AgentTools.db["orders"]:
             return json.dumps({"error": "Order not found"})
         order = AgentTools.db["orders"][order_id]
@@ -183,7 +184,7 @@ class AgentTools:
     @staticmethod
     @tool
     def modify_pending_order_payment(order_id: str, payment_method_id: str) -> str:
-        """Modify the payment method of a pending order."""
+        """Modify the payment method of a pending order. The order_id must include the leading '#' exactly as stored, for example '#W1234567'."""
         if order_id not in AgentTools.db["orders"]:
             return json.dumps({"error": "Order not found"})
         order = AgentTools.db["orders"][order_id]
@@ -205,7 +206,7 @@ class AgentTools:
         country: str,
         zip: str,
     ) -> str:
-        """Modify the shipping address of a pending order."""
+        """Modify the shipping address of a pending order. The order_id must include the leading '#' exactly as stored, for example '#W1234567'."""
         if order_id not in AgentTools.db["orders"]:
             return json.dumps({"error": "Order not found"})
         order = AgentTools.db["orders"][order_id]
@@ -252,7 +253,7 @@ class AgentTools:
     def exchange_delivered_order_items(
         order_id: str, item_ids: list[str], new_item_ids: list[str], payment_method_id: str
     ) -> str:
-        """Exchange items in a delivered order to new items of the same product type."""
+        """Exchange items in a delivered order to new items of the same product type. The order_id must include the leading '#' exactly as stored, for example '#W1234567'."""
         if order_id not in AgentTools.db["orders"]:
             return json.dumps({"error": "Order not found"})
         order = AgentTools.db["orders"][order_id]
@@ -290,7 +291,7 @@ class AgentTools:
     @staticmethod
     @tool
     def return_delivered_order_items(order_id: str, item_ids: list[str], payment_method_id: str) -> str:
-        """Return some items of a delivered order."""
+        """Return some items of a delivered order. The order_id must include the leading '#' exactly as stored, for example '#W1234567'. Call only after policy_verify_return succeeds, refund details are shown, and the user confirms in a subsequent turn."""
         if order_id not in AgentTools.db["orders"]:
             return json.dumps({"error": "Order not found"})
         order = AgentTools.db["orders"][order_id]
@@ -355,8 +356,12 @@ class AgentTools:
 
     @staticmethod
     @tool
-    def policy_verify_return(order_id: str, item_ids: list[str], reason: str) -> str:
-        """Verify return eligibility and calculate fees based on store policy."""
+    def policy_verify_return(
+        order_id: str,
+        item_ids: list[str],
+        reason: Literal["unwanted", "wrong_item", "size_issue", "defective", "other"],
+    ) -> str:
+        """Verify return eligibility and calculate fees based on store policy. The order_id must include the leading '#' exactly as stored, for example '#W1234567'. The reason must be exactly one of: 'unwanted', 'wrong_item', 'size_issue', 'defective', or 'other'; map natural-language reasons to one of these enum values before calling."""
         valid_reasons = ("unwanted", "wrong_item", "size_issue", "defective", "other")
         if reason not in valid_reasons:
             return json.dumps(
@@ -440,7 +445,7 @@ class AgentTools:
     @staticmethod
     @tool
     def transfer_to_human_agents(summary: str) -> str:
-        """Transfer the user to a human agent, with a summary of the user's issue."""
+        """Initiate transfer to a human agent with a factual issue summary. This only starts a transfer; it does not contact a team, open an investigation, submit a request, or complete any other action."""
         return json.dumps(
             {
                 "message": "Transfer initiated. A human agent will follow up shortly.",
